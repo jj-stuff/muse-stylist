@@ -1,0 +1,46 @@
+import {catalog} from './catalog.js';
+const $=s=>document.querySelector(s);
+const state={profile:null,wardrobe:[],history:[],occasion:'',result:null,busy:false,mode:'sample'};
+const colors={ivory:'#e8dfce',blue:'#738697',oatmeal:'#c8b99e',black:'#393633',brown:'#866954',olive:'#7f846a',taupe:'#ae9c86'};
+const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function showTab(name){$('#stylist-view').hidden=name!=='stylist';$('#wardrobe-view').hidden=name!=='wardrobe';document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));}
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+$('#open-wardrobe').onclick=()=>showTab('wardrobe');$('#back-to-stylist').onclick=()=>showTab('stylist');
+function getProfile(){return Object.fromEntries(new FormData($('#profile-form')));}
+$('#profile-form').onsubmit=e=>{e.preventDefault();state.profile=getProfile();$('#profile-status').textContent='Style profile saved. Now tell me about your day.';$('.profile .section-title>span').textContent='03 / 03';$('#occasion').focus();};
+$('#profile-form').onchange=()=>{if(state.profile){state.profile=getProfile();$('#profile-status').textContent='Preferences updated. Your next request will use them.';}};
+function renderWardrobe(){
+ $('#wardrobe-count').textContent=state.wardrobe.length;
+ $('#wardrobe-items').innerHTML=state.wardrobe.map(i=>`<article class="wardrobe-item">${i.data?`<img src="${i.data}" alt="${escape(i.name)}">`:`<div class="sample-tile" style="background:${colors[i.color]||'#eae3d8'};color:${['black','brown','blue'].includes(i.color)?'white':'#352e29'}">${escape(i.name)}</div>`}<label class="sr-only" for="name-${i.id}">Clothing name</label><input id="name-${i.id}" data-name="${i.id}" value="${escape(i.name)}" maxlength="100"><label class="sr-only" for="type-${i.id}">Clothing category</label><select id="type-${i.id}" data-type="${i.id}">${['top','bottom','shoes','layer','dress','accessory'].map(t=>`<option value="${t}" ${i.type===t?'selected':''}>${t}</option>`).join('')}</select><button data-remove="${i.id}" aria-label="Remove ${escape(i.name)}">Remove piece</button></article>`).join('');
+ document.querySelectorAll('[data-name]').forEach(el=>el.onchange=()=>{state.wardrobe.find(i=>i.id===el.dataset.name).name=el.value.trim()||'My clothing';});
+ document.querySelectorAll('[data-type]').forEach(el=>el.onchange=()=>{state.wardrobe.find(i=>i.id===el.dataset.type).type=el.value;});
+ document.querySelectorAll('[data-remove]').forEach(el=>el.onclick=()=>{state.wardrobe=state.wardrobe.filter(i=>i.id!==el.dataset.remove);renderWardrobe();});
+}
+$('#catalog').innerHTML=catalog.map(i=>`<article class="catalog-item"><span class="item-dot" style="display:block;background:${colors[i.color]}"></span><h3>${i.name}</h3><p>${i.type} · $${i.price} sample price</p><button class="text-button" data-add="${i.id}">Add to demo wardrobe +</button></article>`).join('');
+function addSample(id){if(state.wardrobe.length>=12){$('#upload-error').textContent='Your demo closet holds 12 pieces. Remove one before adding another.';return;}if(!state.wardrobe.some(i=>i.id===id))state.wardrobe.push({...catalog.find(i=>i.id===id)});renderWardrobe();}
+document.querySelectorAll('[data-add]').forEach(el=>el.onclick=()=>addSample(el.dataset.add));
+$('#add-samples').onclick=()=>['tee','jeans','sneakers'].forEach(addSample);
+async function resize(file){
+ if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>10*1024*1024)throw new Error('Choose JPEG, PNG or WebP photos smaller than 10 MB.');
+ const bitmap=await createImageBitmap(file);const canvas=document.createElement('canvas');const ratio=Math.min(1,1000/Math.max(bitmap.width,bitmap.height));canvas.width=Math.round(bitmap.width*ratio);canvas.height=Math.round(bitmap.height*ratio);const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();return canvas.toDataURL('image/jpeg',.78);
+}
+$('#upload').onchange=async e=>{const files=[...e.target.files];$('#upload-error').textContent='';for(const file of files){if(state.wardrobe.length>=12){$('#upload-error').textContent='You can add up to 12 pieces. Remove a piece to add another.';break;}try{const data=await resize(file);state.wardrobe.push({id:crypto.randomUUID(),name:file.name.replace(/\.[^.]+$/,'').slice(0,100)||'My clothing',type:'top',data});renderWardrobe();}catch(err){$('#upload-error').textContent=err.message||'This image could not be read. Try another photo.';}}e.target.value='';};
+document.querySelectorAll('[data-occasion]').forEach(el=>el.onclick=()=>{$('#occasion').value=el.dataset.occasion;$('#occasion').focus();});
+document.querySelectorAll('[data-refine]').forEach(el=>el.onclick=()=>{$('#refinement').value=el.dataset.refine;$('#refine-form').requestSubmit();});
+function message(text,user=false){const article=document.createElement('article');article.className=`message ${user?'user-message':'muse-message'}`;if(!user){const avatar=document.createElement('div');avatar.className='avatar';avatar.textContent='m';article.append(avatar);}const p=document.createElement('p');p.textContent=text;article.append(p);$('#messages').append(article);}
+function renderResults(result){const inventory=[...state.wardrobe,...catalog];$('#results').innerHTML=`<div class="outfits">${result.outfits.map((o,n)=>`<article class="outfit"><h3>${escape(o.title)}</h3><ul>${o.items.map(id=>{const i=inventory.find(i=>i.id===id);return `<li>${i.data?`<img src="${i.data}" alt="${escape(i.name)}">`:`<span class="item-dot" style="background:${colors[i.color]||'#dacbbc'}"></span>`}<span>${escape(i.name)}<span class="item-source">${state.wardrobe.some(w=>w.id===id)?'In your demo wardrobe':'Sample closet · $'+i.price}</span></span></li>`;}).join('')}</ul><p>${escape(o.explanation)}</p><p class="tip">Styling note · ${escape(o.tip)}</p><button class="save" data-save="${n}">Download this look ↗</button></article>`).join('')}</div>${result.addition?`<div class="addition"><strong>A little something to consider</strong>${escape(catalog.find(i=>i.id===result.addition).name)} · $${catalog.find(i=>i.id===result.addition).price} sample price. Within your per-piece budget. Optional, not needed to try these looks.</div>`:''}`;
+ document.querySelectorAll('[data-save]').forEach(el=>el.onclick=()=>{const o=result.outfits[Number(el.dataset.save)];const text=`MUSE — ${o.title}\n\n${o.items.map(id=>inventory.find(i=>i.id===id).name).join('\n')}\n\n${o.explanation}\n\n${o.tip}\n\n${result.mode==='sample'?'Sample recommendation':'Generated with Gemini'}`;const url=URL.createObjectURL(new Blob([text],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download='muse-outfit.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+}
+async function request(refinement=''){
+ if(state.busy)return;
+ if(!state.profile){$('#error').textContent='Save your three style preferences first using “That sounds like me”.';$('#profile-form button').focus();return;}
+ const input={profile:state.profile,wardrobe:state.wardrobe,occasion:state.occasion,weather:$('#weather').value,temperature:Number($('#temperature').value),history:state.history,refinement};
+ state.busy=true;$('#error').textContent='';document.querySelectorAll('.send,[data-refine]').forEach(b=>b.disabled=true);$('#mode').textContent='Styling your day…';
+ try{const response=await fetch('api/style',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)});const result=await response.json();if(!response.ok)throw new Error(result.error||'Could not style this look. Please try again.');message(refinement||state.occasion,true);message(result.message);state.result=result;if(refinement){state.history.push(refinement);state.history=state.history.slice(-8);}renderResults(result);$('#occasion-form').hidden=true;$('#refine-form').hidden=false;$('#refinement').value='';$('#results').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});}
+ catch(err){$('#error').textContent=err.message||'Could not connect. Check your connection and try again.';}
+ finally{state.busy=false;document.querySelectorAll('.send,[data-refine]').forEach(b=>b.disabled=false);$('#mode').textContent=state.mode==='gemini'?'Gemini connected':'Sample demo';}
+}
+$('#occasion-form').onsubmit=e=>{e.preventDefault();state.occasion=$('#occasion').value.trim();state.history=[];request();};
+$('#refine-form').onsubmit=e=>{e.preventDefault();request($('#refinement').value.trim());};
+$('#new-occasion').onclick=()=>{$('#occasion-form').hidden=false;$('#refine-form').hidden=true;$('#occasion').focus();};
+fetch('api/status').then(r=>r.json()).then(s=>{state.mode=s.mode;$('#mode').textContent=s.mode==='gemini'?'Gemini connected':'Sample demo';if(s.mode==='gemini')$('#privacy').textContent='Gemini mode · Styling sends your photos and preferences to Google. Nothing is saved by Muse.';}).catch(()=>{$('#error').textContent='The styling server is unavailable. Start the app with npm start.';});
