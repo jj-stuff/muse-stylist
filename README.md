@@ -21,7 +21,7 @@ Edit `.env` locally:
 
 ```dotenv
 GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.8-flash   # falls back to other Flash models when busy or retired
 GOOGLE_CLIENT_ID=   # optional: Google Calendar sign-in (OAuth web client; add your demo URL as an authorised origin)
 ```
 

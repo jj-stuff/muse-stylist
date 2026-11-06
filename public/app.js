@@ -26,14 +26,14 @@ const optionsFor=s=>{const o=steps[s]?.options;return typeof o==='function'?o():
 
 function bubble(content,user=false,cls=''){const el=document.createElement('div');el.className=`msg ${user?'me':'muse'} ${cls}`;if(typeof content==='string')el.textContent=content;else el.append(content);$('#thread').append(el);scrollDown();return el;}
 const say=t=>bubble(t);
-function typing(){const el=bubble(Object.assign(document.createElement('span'),{className:'dots',innerHTML:'<i></i><i></i><i></i>'}),false,'typing');el.setAttribute('aria-label','Muse is typing');return el;}
+function typing(){const el=bubble(Object.assign(document.createElement('span'),{className:'dots',innerHTML:'<i></i><i></i><i></i>'}),false,'typing');el.setAttribute('aria-label','Outfitted is typing');return el;}
 function ask(step){state.step=step;if(steps[step].ask)say(steps[step].ask);chips();}
 function chips(){
  const opts=state.busy?[]:state.pending.length?types.map(t=>t[0].toUpperCase()+t.slice(1)):optionsFor(state.step);
  $('#chips').replaceChildren(...opts.map(o=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=o;b.onclick=()=>handle(o);return b;}));
 }
 const match=(t,opts)=>opts.find(o=>o.toLowerCase()===t.toLowerCase())||t.length>=3&&opts.find(o=>o.toLowerCase().includes(t.toLowerCase())||t.toLowerCase().includes(o.toLowerCase()));
-const guessType=t=>types.find(x=>t.toLowerCase().includes(x))||[[/shirt|tee|blouse|sweater|knit|hoodie|tank|polo/,'top'],[/jean|pant|trouser|skirt|short|legging|chino/,'bottom'],[/shoe|sneaker|boot|loafer|sandal|heel|trainer/,'shoes'],[/jacket|coat|blazer|cardigan|parka/,'layer'],[/bag|hat|cap|scarf|belt|watch/,'accessory']].find(([r])=>r.test(t.toLowerCase()))?.[1];
+const guessType=t=>types.find(x=>new RegExp(`\\b${x}`).test(t.toLowerCase()))||[[/\b(shirt|t-?shirt|tee|blouse|sweater|jumper|knit|hoodie|tank|polo)/,'top'],[/\b(jean|pant|trouser|skirt|short|legging|chino)/,'bottom'],[/\b(shoe|sneaker|boot|loafer|sandal|heel|trainer)/,'shoes'],[/\b(jacket|coat|blazer|cardigan|parka)/,'layer'],[/\b(bag|hat|cap|scarf|belt|watch)s?\b/,'accessory']].find(([r])=>r.test(t.toLowerCase()))?.[1];
 const guessColor=t=>colorWords.find(([r])=>r.test(t.toLowerCase()))?.[1];
 const join=a=>a.length>1?a.slice(0,-1).join(', ')+' and '+a.at(-1):a[0];
 
@@ -54,14 +54,16 @@ function handle(text){
  if(state.step==='closet'&&!state.pending.length){if(text==='Add photos')return $('#upload').click();if(text==='Pick from brands')return $('#closet').showModal();}
  bubble(text,true);
  if(state.pending.length){
+  if(state.mode==='gemini'&&!types.includes(text.toLowerCase()))return aiChat(text);
   const item=state.wardrobe.find(i=>i.id===state.pending.shift());const type=guessType(text);
   if(!type){state.pending.unshift(item.id);say('Is it a top, bottom, shoes, a layer, a dress or an accessory?');return chips();}
-  item.type=type;item.name=types.includes(text.toLowerCase())?`My ${type}`:text.slice(0,100);renderCloset();
+  item.type=type;item.name=types.includes(text.toLowerCase())||text.length>40?`My ${type}`:text[0].toUpperCase()+text.slice(1);renderCloset();
   say(state.pending.length?'Got it. And the next one?':`${item.name} is in your closet.`);
   if(!state.pending.length&&steps[state.step]?.ask&&state.step!=='refine')say(steps[state.step].ask);
   return chips();
  }
  const s=state.step;
+ if(state.mode==='gemini'&&['closet','style','budget','comfort','weather','calendar'].includes(s)&&!optionsFor(s).some(o=>o.toLowerCase()===text.toLowerCase()))return aiChat(text);
  if(s==='closet')return text==='Done'||text==='Skip for now'?startStyle():addTyped(text);
  if(s==='plans'){state.occasion=occasions[text]||text;return request();}
  if(s==='agenda'){if(text!=='Style me')state.occasion=`${state.occasion}. ${text}`.slice(0,1500);return request();}
@@ -91,20 +93,57 @@ function looks(list,{save}={}){
  const inventory=[...state.wardrobe,...catalog],wrap=document.createElement('div');wrap.className='looks';
  wrap.innerHTML=list.map((o,n)=>{const items=o.items.map(id=>inventory.find(i=>i.id===id));return `<article class="look"><div class="pics">${items.slice(0,4).map(tile).join('')}</div><h2><span class="num">${n+1}</span>${escape(o.title)}</h2><ul>${items.map(i=>`<li>${escape(i.name)}${i.brand?` <span class="price">${escape(i.brand)} · $${i.price}</span>`:''}</li>`).join('')}</ul>${o.explanation?`<p>${escape(o.explanation)}</p><p>${escape(o.tip)}</p>`:''}${save?`<button class="link strong" data-save="${n}">Save look</button>`:''}</article>`;}).join('');
  fallback(wrap);
- wrap.querySelectorAll('[data-save]').forEach(el=>el.onclick=()=>{const o=list[Number(el.dataset.save)];const text=`MUSE — ${o.title}\n\n${o.items.map(id=>inventory.find(i=>i.id===id).name).join('\n')}\n\n${o.explanation}\n\n${o.tip}\n\n${state.result.mode==='sample'?'Sample recommendation':'Generated with Gemini'}`;const url=URL.createObjectURL(new Blob([text],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download='muse-outfit.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+ wrap.querySelectorAll('[data-save]').forEach(el=>el.onclick=()=>{const o=list[Number(el.dataset.save)];const text=`OUTFITTED — ${o.title}\n\n${o.items.map(id=>inventory.find(i=>i.id===id).name).join('\n')}\n\n${o.explanation}\n\n${o.tip}\n\n${state.result.mode==='sample'?'Sample recommendation':'Generated with Gemini'}`;const url=URL.createObjectURL(new Blob([text],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download='muse-outfit.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
  $('#thread').append(wrap);scrollDown();
 }
 
+async function fetchWeather(){
+ const {coords}=await new Promise((ok,no)=>navigator.geolocation?navigator.geolocation.getCurrentPosition(ok,no,{timeout:10000,maximumAge:600000}):no());
+ const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude.toFixed(2)}&longitude=${coords.longitude.toFixed(2)}&current=temperature_2m,weather_code`);if(!r.ok)throw 0;
+ const {current}=await r.json();const code=current.weather_code;
+ state.weather=code>=51?'Rainy':code>=2?'Cloudy':'Sunny';state.temperature=Math.round(current.temperature_2m);
+ return `It’s ${state.temperature}° and ${code>=71&&code<=86?'snowy':state.weather.toLowerCase()} outside.`;
+}
 async function checkWeather(){
  state.step='';state.busy=true;chips();say('Let me check the weather where you are.');const t=typing();
+ try{const line=await fetchWeather();t.remove();say(line);state.busy=false;ask('calendar');}
+ catch{t.remove();say('I couldn’t get the weather, so tell me.');state.busy=false;ask('weather');}
+}
+
+// Gemini mode: free text gets a real reply, and whatever it states (pieces, style, plans, weather) fills the flow.
+async function aiChat(text){
+ state.busy=true;chips();const t=typing();
  try{
-  const {coords}=await new Promise((ok,no)=>navigator.geolocation?navigator.geolocation.getCurrentPosition(ok,no,{timeout:10000,maximumAge:600000}):no());
-  const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude.toFixed(2)}&longitude=${coords.longitude.toFixed(2)}&current=temperature_2m,weather_code`);if(!r.ok)throw 0;
-  const {current}=await r.json();const code=current.weather_code;
-  state.weather=code>=51?'Rainy':code>=2?'Cloudy':'Sunny';state.temperature=Math.round(current.temperature_2m);
-  t.remove();say(`It’s ${state.temperature}° and ${code>=71&&code<=86?'snowy':state.weather.toLowerCase()} outside.`);
-  state.busy=false;ask('calendar');
- }catch{t.remove();say('I couldn’t get the weather, so tell me.');state.busy=false;ask('weather');}
+  const pending=state.wardrobe.find(i=>i.id===state.pending[0]);
+  const response=await fetch('api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text.slice(0,1500),photo:pending?.data,step:state.step,profile:state.profile,wardrobe:state.wardrobe.map(({name,type})=>({name,type})),occasion:state.occasion,weather:state.weather,temperature:state.weather?state.temperature:null})});
+  const r=await response.json();if(!response.ok)throw new Error(r.error);
+  t.remove();
+  if(pending&&r.photo){Object.assign(pending,r.photo);state.pending.shift();}
+  for(const p of r.add||[])if(state.wardrobe.length<12)state.wardrobe.push({id:crypto.randomUUID(),...p});
+  renderCloset();Object.assign(state.profile,r.profile);
+  if(r.occasion)state.occasion=r.occasion;
+  if(r.weather){state.weather=r.weather;state.temperature=r.temperature??{Sunny:24,Cloudy:18,Rainy:12}[r.weather];}
+  say(r.reply);state.busy=false;
+  if(state.pending.length){say(pending&&r.photo?'And the next one?':'What is it?');return chips();}
+  if(r.ready){state.occasion||=text.slice(0,1500);return styleNow();}
+  resume();
+ }catch(err){t.remove();state.busy=false;bubble(err.message||'I didn’t catch that. Try again?',false,'error').setAttribute('role','alert');chips();}
+}
+function resume(){
+ const go=step=>state.step===step?chips():ask(step);
+ if(state.step==='closet')return chips();
+ if(!state.profile.style)return state.step==='style'?chips():startStyle();
+ if(!state.profile.budget)return go('budget');
+ if(!state.profile.comfort)return go('comfort');
+ if(!state.weather)return checkWeather();
+ if(state.step==='weather')return ask('calendar');
+ if(state.step==='calendar')return chips();
+ return state.occasion?request():ask('plans');
+}
+async function styleNow(){
+ Object.assign(state.profile,{style:state.profile.style||'Minimal',budget:state.profile.budget||'100',comfort:state.profile.comfort||'A little polished'});
+ if(!state.weather){state.busy=true;chips();try{say(await fetchWeather());}catch{state.weather='Cloudy';state.temperature=18;say('I couldn’t get the weather, so I’ll plan for about 18° and cloudy.');}state.busy=false;}
+ request();
 }
 
 function useEvents(events){
@@ -168,7 +207,7 @@ async function upload(e,inChat){
   catch(err){(inChat?say:alert)(err.message||'That photo didn’t work. Try another one.');}
  }
  renderCloset();
- if(inChat&&added){say(added>1?'Nice. What are these? Start with the first one.':'Nice. What is it?');if(state.mode==='gemini')say('When I style your day, I send your photos to Gemini to look at them. Muse doesn’t keep them.');}
+ if(inChat&&added){say(added>1?'Nice. What are these? Start with the first one.':'Nice. What is it?');if(state.mode==='gemini')say('When I style your day, I send your photos to Gemini to look at them. Outfitted doesn’t keep them.');}
  chips();
 }
 $('#upload').onchange=e=>upload(e,true);
@@ -179,7 +218,7 @@ $('#closet').onclick=e=>{if(e.target===$('#closet'))$('#closet').close();};
 $('#closet').onclose=()=>{if(state.step==='closet'&&state.wardrobe.length){say(`Your closet has ${state.wardrobe.length} piece${state.wardrobe.length>1?'s':''}. Add more, or tap Done.`);chips();}};
 
 renderCloset();
-say('Hi, I’m Muse. I’ll put three outfits together for your day.');
+say('Hi, I’m Outfitted. I’ll put three outfits together for your day.');
 say('First, show me what you own. Add photos, pick pieces from brands I know, or just type them, like “black jeans, white tee”.');
 state.step='closet';chips();
 fetch('api/status').then(r=>r.json()).then(s=>{state.mode=s.mode;state.googleClientId=s.googleClientId;if(s.googleClientId)loadCalendar().catch(()=>{});chips();}).catch(()=>bubble('I can’t reach the styling server. Start the app with npm start.',false,'error'));
