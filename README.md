@@ -22,7 +22,10 @@ Edit `.env` locally:
 ```dotenv
 GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-2.5-flash
+GOOGLE_CLIENT_ID=   # optional: Google Calendar sign-in (OAuth web client; add your demo URL as an authorised origin)
 ```
+
+Catalog pictures: with the key set, run `npm run pictures` once (macOS) to generate `public/assets/*.jpg`. Until then the app shows colour tiles.
 
 Restart `npm start`. The badge should read **Gemini connected** (configuration present; the first successful styling request verifies API access). Get a key from [Google AI Studio](https://aistudio.google.com/apikey). Never commit `.env` or paste the key into browser code. You can change GEMINI_MODEL if your account uses a different supported model.
 

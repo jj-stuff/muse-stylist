@@ -1,1 +1,1 @@
-{"name":"muse-stylist","version":"1.0.0","private":true,"type":"module","scripts":{"dev":"node --env-file-if-exists=.env server.mjs","start":"node --env-file-if-exists=.env server.mjs","test":"node --test","build":"node build.mjs"},"engines":{"node":">=22"}}
+{"name":"muse-stylist","version":"1.0.0","private":true,"type":"module","scripts":{"dev":"node --env-file-if-exists=.env server.mjs","start":"node --env-file-if-exists=.env server.mjs","test":"node --test","pictures":"node --env-file=.env scripts/make-pictures.mjs","build":"node build.mjs"},"engines":{"node":">=22"}}
