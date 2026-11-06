@@ -2,7 +2,7 @@ import {generateOutfits} from './stylist.mjs';
 export async function handleApi(request,env={}){
  const path=new URL(request.url).pathname;
  const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
- if(path==='/api/status'&&request.method==='GET')return json({mode:env.GEMINI_API_KEY?'gemini':'sample'});
+ if(path==='/api/status'&&request.method==='GET')return json({mode:env.GEMINI_API_KEY?'gemini':'sample',googleClientId:env.GOOGLE_CLIENT_ID||null});
  if(path!=='/api/style')return json({error:'Not found'},404);
  if(request.method!=='POST')return json({error:'Use POST'},405);
  const origin=request.headers.get('origin');if(origin&&origin!==new URL(request.url).origin)return json({error:'Cross-origin requests are not allowed.'},403);
