@@ -18,10 +18,10 @@ export function sampleOutfits(input) {
  const warm=Number(temperature)<17 || /warm/.test(request);
  const casual=/less formal|casual|sneaker/.test(request)||profile.comfort==='Comfort first';
  const formal=/date|dinner|office|interview|formal/.test(occasion.toLowerCase())&&!casual;
- const pick=(type,id)=>wardrobe.find(i=>i.type===type && (!/black sneakers/.test(request)||type!=='shoes'||/black.*sneaker/i.test(i.name))) || catalog.find(i=>i.id===id);
+ const pick=(type,id,index=0)=>wardrobe.filter(i=>i.type===type && (!/black sneakers/.test(request)||type!=='shoes'||/black.*sneaker/i.test(i.name)))[index] || catalog.find(i=>i.id===id);
  const tops=profile.style==='Classic'?['shirt','tee']:profile.style==='Expressive'?['shirt','knit']:['tee','shirt'];
  const outfits=[0,1].map(n=>{
-  const items=[pick('top',warm?'knit':tops[n]),pick('bottom',n===0?(formal?'trousers':'jeans'):(profile.style==='Expressive'?'skirt':'trousers')),pick('shoes',casual||/black sneakers/.test(request)?'sneakers':n===0?'sneakers':'loafers')];
+  const items=[pick('top',warm?'knit':tops[n]),pick('bottom',n===0?(formal?'trousers':'jeans'):(profile.style==='Expressive'?'skirt':'trousers'),n),pick('shoes',casual||/black sneakers/.test(request)?'sneakers':n===0?'sneakers':'loafers')];
   if(warm||weather==='Rainy'||formal) items.push(pick('layer',casual||weather==='Rainy'?'jacket':'blazer'));
   return {title:n===0?'Easy does it':'A little more intention',items:items.map(i=>i.id),explanation:`${profile.style} pieces for ${occasion.trim()}. ${warm?'A soft knit and an extra layer help with the chill.': 'An easy top keeps the look light.'} ${casual?'Sneakers keep comfort at the center.':'A clean silhouette adds polish.'} ${weather==='Rainy'?'Bring an umbrella; the sample jacket is not verified waterproof.':''}`,tip:n===0?'Keep the top relaxed for the day; tuck it in for your evening plans.':'Try a half-tuck and roll the sleeves to make the proportions feel effortless.'};
  });
